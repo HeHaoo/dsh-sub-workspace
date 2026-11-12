@@ -1,0 +1,22 @@
+{
+  "name": "dsh-sub-workspace",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Per-workspace affiliate (extra writable) paths for DeepSeek Harness: decorate the live sandboxPolicy service so official write/edit/bash tools honor workspace-scoped extra roots, plus an inline '附属' button on every workspace row that opens an affiliate-path panel, with changes taking effect immediately for both new and historical sessions.",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "license": "MIT"
+}

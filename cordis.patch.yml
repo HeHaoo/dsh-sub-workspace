@@ -1,0 +1,13 @@
+# dsh-sub-workspace bundle patch.
+#
+# Mounts ONE row. This plugin deliberately does NOT disable or replace any
+# official row: it decorates the already-registered `sandboxPolicy` service in
+# place (see src/decorate.js), so the official sandbox-policy / fs-sandbox /
+# bash-sandbox rows keep running untouched.
+#
+# Because the decoration happens at runtime on the live service instance, the
+# plugin must load AFTER `sandbox-policy` has provided the service. Cordis
+# `inject` expresses that ordering; no manual row placement is needed.
+- insert:
+    - id: sub-workspace
+      name: 'dsh-sub-workspace'

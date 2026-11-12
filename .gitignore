@@ -1,0 +1,20 @@
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# local scratch that must never be published
+.stash/
+*.log
+*.tmp
+
+# never commit credentials: the verify suite reads DSH_AUTH_SECRET or
+# ~/.dsh/.credentials.yaml at runtime instead of storing them
+*.credentials.yaml
+.env
+.env.*
+
+# NOTE: scripts/verify/shots/*.png ARE tracked on purpose — the verify READMEs
+# link to them. They are regenerated (not hand-edited) whenever capture.mjs runs,
+# so expect binary churn in diffs; that is a documentation artifact, not source.
