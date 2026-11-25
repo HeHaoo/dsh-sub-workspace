@@ -447,3 +447,105 @@ test('a ~ workspace key is still refused: keys are real cwd paths', async () => 
   })
 })
 
+// ---------------------------------------------------------------------------
+// Workspace-relative paths over HTTP: a relative `path` in a mutation or check
+// is resolved against the (absolute) `workspace` key, never the process cwd.
+// ---------------------------------------------------------------------------
+
+test('add resolves a relative path against the workspace key', async () => {
+  const h = harness()
+  const workspace = tempDir()
+  const affiliate = join(workspace, 'other-repo')
+  mkdirSync(affiliate)
+
+  const response = await post(h.routeOf(ROUTE_MUTATE), {
+    workspace,
+    action: 'add',
+    path: 'other-repo',
+  })
+  assert.equal(response.status, 200)
+  const payload = await body(response)
+  assert.deepEqual(payload.roots, [affiliate])
+  assert.equal(payload.added, affiliate)
+  assert.deepEqual(h.store.get(workspace), [affiliate])
+})
+
+test('a relative path without a usable workspace base stays refused', async () => {
+  // The workspace key itself is still required to be absolute; the existing
+  // "relative workspace key is refused" test covers that. Here the base is
+  // absolute, so a relative path resolves — but an absolute path still wins.
+  const h = harness()
+  const workspace = tempDir()
+  const affiliate = tempDir()
+  const payload = await body(
+    await post(h.routeOf(ROUTE_MUTATE), { workspace, action: 'add', path: affiliate }),
+  )
+  assert.deepEqual(payload.roots, [affiliate], 'absolute paths keep their existing behaviour')
+})
+
+test('remove of a relative path drops the root that was added relatively', async () => {
+  const h = harness()
+  const workspace = tempDir()
+  const affiliate = join(workspace, 'other-repo')
+  mkdirSync(affiliate)
+  const route = h.routeOf(ROUTE_MUTATE)
+
+  await post(route, { workspace, action: 'add', path: 'other-repo' })
+  assert.deepEqual(h.store.get(workspace), [affiliate])
+
+  const payload = await body(await post(route, { workspace, action: 'remove', path: 'other-repo' }))
+  assert.deepEqual(payload.roots, [])
+  assert.equal(payload.removed, affiliate)
+  assert.deepEqual(h.store.get(workspace), [])
+})
+
+test('set resolves a mix of relative and absolute paths against the workspace', async () => {
+  const h = harness()
+  const workspace = tempDir()
+  const relative = join(workspace, 'in-repo')
+  mkdirSync(relative)
+  const absolute = tempDir()
+
+  const payload = await body(
+    await post(h.routeOf(ROUTE_MUTATE), {
+      workspace,
+      action: 'set',
+      // `in-repo` written relatively and absolutely must collapse to one root.
+      paths: ['in-repo', relative, absolute],
+    }),
+  )
+  assert.deepEqual(payload.roots, [relative, absolute])
+})
+
+test('check resolves a relative path against the workspace/session param', async () => {
+  const h = harness()
+  const workspace = tempDir()
+  const affiliate = join(workspace, 'other-repo')
+  mkdirSync(affiliate)
+
+  const url = `http://127.0.0.1${ROUTE_CHECK}?path=${encodeURIComponent('other-repo')}&workspace=${encodeURIComponent(workspace)}`
+  const payload = await body(await h.routeOf(ROUTE_CHECK).fetch(new Request(url)))
+  // The relative `path` resolved against the workspace param, so check reports
+  // the physical affiliate — the same spelling an absolute add would have stored.
+  assert.equal(payload.path, affiliate)
+  assert.equal(payload.workspace, h.policy.workspaceRoot)
+})
+
+test('check of a relative path with a symlink result is refused with a reason', async () => {
+  const h = harness()
+  const workspace = tempDir()
+  const link = join(workspace, 'ln')
+  try {
+    symlinkSync(tempDir(), link)
+  } catch (error) {
+    // Creating a symlink needs a privilege on Windows; nothing to assert there.
+    if (error?.code !== 'EPERM' && error?.code !== 'EACCES') throw error
+    return
+  }
+
+  const url = `http://127.0.0.1${ROUTE_CHECK}?path=${encodeURIComponent('ln')}&session=${encodeURIComponent(workspace)}`
+  const payload = await body(await h.routeOf(ROUTE_CHECK).fetch(new Request(url)))
+  assert.equal(payload.writable, false)
+  assert.match(payload.reason, /physical path/)
+})
+

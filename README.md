@@ -1,5 +1,7 @@
 # dsh-sub-workspace
 
+![version](https://img.shields.io/badge/version-0.2.1-blue) ![npm](https://img.shields.io/npm/v/dsh-sub-workspace) ![license](https://img.shields.io/badge/license-MIT-green)
+
 给 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的**工作区**加「附属路径」：
 在会话自己的工作区目录之外，额外允许写几个目录。**按工作区隔离**，改完**下一次工具调用就生效**。
 
@@ -41,13 +43,17 @@ cd dsh-sub-workspace
 **① 点「附属」按钮** —— 侧栏每个工作区行末尾会多出一个小按钮，点开就是管理面板：
 列出当前的附属路径（可移除）、输入框添加。
 
-路径可以写绝对路径，也可以写家目录：
+路径可以写绝对路径、家目录或相对工作区的路径：
 
 | 写法 | 结果 |
 | --- | --- |
 | 绝对路径 | 直接用（Windows 写 `D:\\src\\other-repo`） |
 | `~/src/other-repo`、`~` | 展开成你的 home |
+| `../other-repo`、`./sibling` | 相对当前配置的工作区目录解析 |
 | `~someuser/...` | **不支持**，明确报错（不猜） |
+
+相对路径始终以**当前工作区目录**为基准，而不是进程的启动目录，所以从一个工作区切到另一个工作区，
+同一个相对写法指向的是各自的目录。
 
 **② 直接跟模型说** —— 「把 ~/dev/my-api-service 加到这个工作区的附属路径」，模型会调
 `sub_workspace` 工具：`list` / `add` / `remove` / `set` / `check`。
@@ -58,7 +64,7 @@ cd dsh-sub-workspace
 
 - 必须是**已存在**的**目录**
 - 不接受软链：`realpath` 解出的路径必须等于你写的路径（防止 grant 被重定向）
-- `~` 先展开，再走完全相同的检查链——所以软链禁令对两种写法一视同仁
+- `~` 先展开；相对路径先按工作区目录解析；然后走完全相同的检查链——所以软链禁令对三种写法一视同仁
 
 校验在写入前完成。官方在强制路径时遇到坏条目会抛错、导致**所有**写入失败；本插件不让坏条目进入热路径。
 
@@ -77,7 +83,7 @@ cd dsh-sub-workspace
 ## 测试
 
 ```bash
-node --test test/*.test.mjs    # 83 项
+node --test test/*.test.mjs    # 95 项
 ```
 
 真实 DSH + 真实浏览器上的端到端验证（可选，需要 DSH 和 Chrome）：
@@ -85,10 +91,20 @@ node --test test/*.test.mjs    # 83 项
 ```bash
 node scripts/verify/run-all.mjs                              # 5 个检查
 node scripts/verify/run-all.mjs --only api,routes,sandbox    # 不需要浏览器，约 0.4 秒
+node scripts/verify/relative-live-check.mjs                  # 相对路径端到端（add → check → remove）
 ```
 
 端口默认 52524，用 `--port` / `DSH_PORT` 覆盖；CDP 默认 9334，用 `--cdp-port` 覆盖。
 没有调试端口时脚本以退出码 2（SKIP）结束并说明前置条件，不会假装通过。
+
+## 更新日志
+
+### 0.2.1
+
+- 新增：配置附属工作区时支持**相对路径**，以当前工作区目录为基准解析（`../other-repo`、`./sibling` 等）。
+- 相对路径与绝对路径/`~/` 走完全相同的校验链：目录必须存在、拒绝软链；无工作区上下文的相对路径调用仍被拒绝。
+- 新增 `scripts/verify/relative-live-check.mjs`，对运行中的 DSH 做相对路径 add → check → remove 端到端验证。
+
 
 ## 文件结构
 
@@ -104,7 +120,7 @@ lib/
 scripts/
   install.sh    幂等安装
   verify/       真实 DSH + 真实浏览器的验证套件
-test/           83 项单元测试
+test/           95 项单元测试
 ```
 
 ## 深入

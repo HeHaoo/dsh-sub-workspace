@@ -191,6 +191,13 @@ row.appendChild(button)                 // ← 行尾追加，不是菜单项
 并提示真实的物理路径。`~` 只有出现在**开头**才展开；`/a/~/b` 里的 `~` 是普通字符。
 `~user` 明确报错而不是猜——那需要查系统用户库。
 
+**相对路径**相对**当前配置的工作区目录**解析，不相对进程 cwd。`validateRoot(path, base)` /
+`removalCandidates(path, base)` 的 `base` 就是该工作区目录：工具侧取
+`exec.agent.session.header.cwd`，HTTP 侧取请求的绝对 `workspace` 键，`check` 取 `?workspace=` /
+`?session=`。无 `base` 的相对路径仍被拒绝（`must be absolute`），这样旧调用方不会因宿主恰好从某个
+目录启动而意外授予权限；`scripts/verify/routes-check.mjs` 的回归护栏就是这条。相对路径解析成
+绝对路径后走**完全相同**的检查链，所以软链、缺失、文件三类禁令对相对写法一视同仁。
+
 ---
 
 ## 8. 测试

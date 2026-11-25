@@ -253,11 +253,24 @@ await run(async () => {
   else report.fail('check refuses a missing path argument', noArg.text)
 
   // ---- validateRoot directly (the guard every mutation goes through) ---
+  // Without a base a relative path stays refused (an old caller must never
+  // silently grant a directory based on the host process cwd). With a base it
+  // resolves against that workspace directory — the new capability.
   try {
     validateRoot('relative/path')
-    report.fail('validateRoot refuses a relative path', 'accepted')
+    report.fail('validateRoot refuses a relative path without a base', 'accepted')
   } catch (error) {
-    report.pass('validateRoot refuses a relative path', error.message)
+    report.pass('validateRoot refuses a relative path without a base', error.message)
+  }
+  try {
+    const physical = validateRoot('../affiliate', fixture.workspaceDir)
+    if (physical === physicalAffiliate) {
+      report.pass('validateRoot resolves a relative path against the workspace base', physical)
+    } else {
+      report.fail('validateRoot resolves a relative path against the workspace base', physical + ' != ' + physicalAffiliate)
+    }
+  } catch (error) {
+    report.fail('validateRoot resolves a relative path against the workspace base', error.message)
   }
 
   // ---- B. live probes --------------------------------------------------

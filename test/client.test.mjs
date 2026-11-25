@@ -810,7 +810,7 @@ test('the 附属 trigger is styled by class, not by inline colours', async () =>
   assert.ok(css.includes('--dsw-alias-interactive-bg-hover'), 'trigger gets a hover fill like the host row buttons')
 })
 
-test('the path input advertises ~/ support', async () => {
+test('the path input advertises ~/ and relative-path support', async () => {
   resetDom()
   stubFetch(LIST)
   const row = addRow(documentStub.body, 'alpha')
@@ -828,6 +828,7 @@ test('the path input advertises ~/ support', async () => {
   const input = documentStub.body.querySelector('.sws-panel').querySelectorAll('input')[0]
   assert.ok(input, 'the panel must render a path input')
   assert.match(input.placeholder, /~\//, 'the placeholder must show the ~/ form')
+  assert.match(input.placeholder, /相对工作区/, 'the placeholder must advertise workspace-relative paths')
 })
 
 test('decorates rows that mount AFTER activation (the poll fix)', async () => {

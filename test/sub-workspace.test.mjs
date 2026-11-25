@@ -413,3 +413,74 @@ test('a store keyed by a ~ grant round-trips as the physical path', () => {
   })
 })
 
+// ---------------------------------------------------------------------------
+// Workspace-relative paths: a relative path is resolved against the workspace
+// directory passed as `base`, never against process.cwd(). Without a base a
+// relative path is still refused, so an old caller cannot silently grant a
+// directory based on where the host process happened to start.
+// ---------------------------------------------------------------------------
+
+test('validateRoot resolves a relative path against the workspace base', () => {
+  const workspace = tempDir()
+  const affiliate = join(workspace, 'other-repo')
+  mkdirSync(affiliate)
+
+  assert.equal(validateRoot('other-repo', workspace), affiliate)
+  assert.equal(validateRoot('./other-repo', workspace), affiliate)
+  // A parent traversal is resolved by realpath, exactly like an absolute path.
+  const parent = resolve(workspace, '..')
+  assert.equal(validateRoot('..', workspace), parent)
+})
+
+test('validateRoot refuses a relative path when no base is supplied', () => {
+  // Backwards compatibility and safety: the older one-argument call must keep
+  // rejecting relative paths. The regression guard in scripts/verify relies on it.
+  assert.throws(() => validateRoot('relative/path'), /must be absolute/)
+  assert.throws(() => validateRoot('./x'), /must be absolute/)
+  assert.throws(() => validateRoot('..'), /must be absolute/)
+  // An empty/blank base is also refused, rather than falling back to process cwd.
+  assert.throws(() => validateRoot('relative/path', ''), /must be absolute/)
+})
+
+test('validateRoot still enforces every rule on a base-resolved relative path', () => {
+  const workspace = tempDir()
+  // A symlink reached relatively is refused just like an absolute one. Creating
+  // a symlink needs a privilege on Windows (Developer Mode / admin), so guard it
+  // and keep the other assertions runnable everywhere.
+  const link = join(workspace, 'link')
+  try {
+    symlinkSync(tempDir(), link)
+    assert.throws(() => validateRoot('link', workspace), /physical path, not a symlink/)
+  } catch (error) {
+    if (error?.code !== 'EPERM' && error?.code !== 'EACCES') throw error
+  }
+  // Missing and file paths keep their dedicated errors.
+  assert.throws(() => validateRoot('nope', workspace), /not readable/)
+  const file = join(workspace, 'f.txt')
+  writeFileSync(file, 'x')
+  assert.throws(() => validateRoot('f.txt', workspace), /must be a directory/)
+})
+
+test('relative and absolute spellings of the same directory collapse to one root', () => {
+  const workspace = tempDir()
+  const affiliate = join(workspace, 'other-repo')
+  mkdirSync(affiliate)
+  const { store } = tempStore()
+  store.add('/ws/one', validateRoot('other-repo', workspace))
+  store.add('/ws/one', validateRoot(affiliate))
+  assert.deepEqual(store.get('/ws/one'), [affiliate], 'relative and absolute spellings must be one canonical root')
+})
+
+test('removalCandidates resolves a relative path against the workspace base', () => {
+  const workspace = tempDir()
+  const affiliate = join(workspace, 'other-repo')
+  mkdirSync(affiliate)
+
+  // The physical spelling comes first and matches what a relative add stored.
+  assert.equal(removalCandidates('other-repo', workspace)[0], affiliate)
+  assert.ok(removalCandidates('./other-repo', workspace).includes(affiliate))
+  // Without a base the raw spelling is still returned (a removal no-op), never
+  // resolved against process.cwd().
+  assert.ok(removalCandidates('other-repo').includes('other-repo'))
+})
+

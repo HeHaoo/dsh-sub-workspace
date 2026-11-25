@@ -6,6 +6,7 @@ Thumbs.db
 
 # local scratch that must never be published
 .stash/
+.verify-backup/
 *.log
 *.tmp
 
